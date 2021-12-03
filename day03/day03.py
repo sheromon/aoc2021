@@ -39,13 +39,14 @@ def get_value(current_array, most_common=True):
     ind = 0
     while current_array.shape[0] > 1:
         means = np.mean(current_array, axis=0)
-        ints = np.round(means + 1e-8).astype(np.int32)
+        # python rounds 0.5 to 0 because 0 is even, and I want it to round to 1,
+        # not 0, so use a hack. add 1, get 1.5 to round to 2, then subtract 1.
+        ints = np.round(means + 1).astype(np.int32) - 1
         common_val = ints[ind]
         keep_inds = current_array[:, ind] == common_val
         if not most_common:
             keep_inds = np.logical_not(keep_inds)
         current_array = current_array[keep_inds, :]
-        # print(current_array)
         ind += 1
     assert current_array.shape[0] == 1
     return np.squeeze(current_array)
