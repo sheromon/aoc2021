@@ -30,19 +30,19 @@ def test03a():
 def day03b(input_path):
     total_array = load_array(input_path)
     ints = get_value(total_array.copy(), most_common=True)
-    oxygen = np.sum([val * 2**(len(ints)-ind-1) for ind, val in enumerate(ints)])
+    oxygen = np.sum([val * 2**ind for ind, val in enumerate(ints[::-1])])
     ints = get_value(total_array.copy(), most_common=False)
-    co2 = np.sum([val * 2**(len(ints)-ind-1) for ind, val in enumerate(ints)])
+    co2 = np.sum([val * 2**ind for ind, val in enumerate(ints[::-1])])
     return oxygen * co2
+
 
 def get_value(current_array, most_common=True):
     ind = 0
     while current_array.shape[0] > 1:
-        means = np.mean(current_array, axis=0)
+        mean = np.mean(current_array[:, ind])
         # python rounds 0.5 to 0 because 0 is even, and I want it to round to 1,
         # not 0, so use a hack. add 1, get 1.5 to round to 2, then subtract 1.
-        ints = np.round(means + 1).astype(np.int32) - 1
-        common_val = ints[ind]
+        common_val = np.round(mean + 1).astype(np.int32) - 1
         keep_inds = current_array[:, ind] == common_val
         if not most_common:
             keep_inds = np.logical_not(keep_inds)
