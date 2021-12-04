@@ -4,12 +4,7 @@ import numpy as np
 def load_array(input_path):
     with open(input_path) as file_obj:
         bits = [line.strip() for line in file_obj]
-    array_list = []
-    for row in bits:
-        int_list = [int(val) for val in row]
-        int_array = np.array(int_list)
-        array_list.append(int_array)
-    return np.array(array_list)
+    return np.array([[int(val) for val in row] for row in bits])
 
 
 def day03a(input_path):
