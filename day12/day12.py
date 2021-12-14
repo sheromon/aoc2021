@@ -39,8 +39,7 @@ def explore(cave_map, node, visited):
     valid_paths = 0
     next_nodes = cave_map[node]
     for next_node in next_nodes:
-        valid = explore(cave_map, next_node, visited)
-        valid_paths += valid
+        valid_paths += explore(cave_map, next_node, visited)
 
     return valid_paths
 
@@ -50,15 +49,42 @@ def test12a():
 
 
 def day12b(input_path):
-    pass
+    """Return the number of valid paths that go from start to end of the caves."""
+    cave_map = construct_cave_map(input_path)
+    return explore2(cave_map, 'start', defaultdict(int))
+
+
+def explore2(cave_map, node, visited):
+    """Return the number of valid paths starting at node and ending at 'end'.
+
+    At most, one small cave can be visited twice, and other small caves cannot
+    be visited more than once.
+    """
+    if node == 'end':
+        return 1
+    if (node == 'start') and (visited[node] >= 1):
+        return 0
+    if ord(node[0]) >= 97:
+        if visited[node] >= 2:
+            return 0
+        visited[node] += 1
+        if sum([val == 2 for val in visited.values()]) > 1:
+            return 0
+
+    valid_paths = 0
+    next_nodes = cave_map[node]
+    for next_node in next_nodes:
+        valid_paths += explore2(cave_map, next_node, copy.deepcopy(visited))
+
+    return valid_paths
 
 
 def test12b():
-    pass
+    assert 36 == day12b('test_input.txt')
 
 
 if __name__ == '__main__':
     test12a()
     print('Day 12a:', day12a('day12_input.txt'))
-    # test12b()
-    # print('Day 12b:', day12b('day12_input.txt'))
+    test12b()
+    print('Day 12b:', day12b('day12_input.txt'))
