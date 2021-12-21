@@ -1,25 +1,34 @@
+import operator
 from pathlib import Path
+
+import numpy as np
 
 
 def day16a(input_str):
+    """Return the sum of the versions of the packets and sub-packets."""
     if Path(input_str).is_file():
         with open(input_str) as file_obj:
             input_str = file_obj.readline().strip()
     vals = [int(char, base=16) for char in input_str]
     bin_str = ''.join(format(val, '04b') for val in vals)
     packets = parse(bin_str)
-    val = sum(packet['ver'] for packet in packets)
+    val = sum(packet['version'] for packet in packets)
     return val
 
 
-def parse(bin_str):
+def parse(bin_str, process=False):
+    """Parse packets and sub-packets according to complicated rules.
+
+    :param process: bool, optional; if True, process operator packets to get a
+        resulting value; if False, return the raw sub-packets
+    """
     packet = {
-        'ver': int(bin_str[:3], base=2),
-        'typ': int(bin_str[3:6], base=2),
+        'version': int(bin_str[:3], base=2),
+        'type': int(bin_str[3:6], base=2),
     }
 
     ind = 6
-    if packet['typ'] == 4:  # literal value
+    if packet['type'] == 4:  # literal value
         done = False
         value_str = ''
         while not done:
@@ -30,7 +39,6 @@ def parse(bin_str):
                 done = True
         packet['value'] = int(value_str, base=2)
         packet['remainder'] = bin_str[ind:]
-        packet['last_ind'] = ind
         return [packet]
 
     # if not literal, then operator
@@ -43,19 +51,38 @@ def parse(bin_str):
         sub_packets = []
         num_read = 0
         while num_read < length:
-            sub_packets += parse(remainder)
+            sub_packets += parse(remainder, process=process)
             num_read += len(remainder) - len(sub_packets[-1]['remainder'])
             remainder = sub_packets[-1]['remainder']
-        return [packet] + sub_packets
     else:
         num_sub = int(bin_str[ind:ind+11], base=2)
         ind += 11
         remainder = bin_str[ind:]
         sub_packets = []
         for _ in range(num_sub):
-            sub_packets += parse(remainder)
+            sub_packets += parse(remainder, process=process)
             remainder = sub_packets[-1]['remainder']
+    packet['remainder'] = remainder
+
+    if not process:
         return [packet] + sub_packets
+
+    func_types = {
+        0: sum,
+        1: np.prod,
+        2: np.min,
+        3: np.max,
+    }
+    cmp_types = {
+        5: operator.gt,
+        6: operator.lt,
+        7: operator.eq,
+    }
+    if packet['type'] in func_types:
+        packet['value'] = func_types[packet['type']]([packet['value'] for packet in sub_packets])
+    else:
+        packet['value'] = cmp_types[packet['type']](sub_packets[0]['value'], sub_packets[1]['value'])
+    return [packet]
 
 
 def test16a():
@@ -68,16 +95,29 @@ def test16a():
     assert 31 == day16a('A0016C880162017C3686B18A3D4780')
 
 
-def day16b(input_path):
-    pass
+def day16b(input_str):
+    """Return the value of the packet, processing all operator packets."""
+    if Path(input_str).is_file():
+        with open(input_str) as file_obj:
+            input_str = file_obj.readline().strip()
+    vals = [int(char, base=16) for char in input_str]
+    bin_str = ''.join(format(val, '04b') for val in vals)
+    return parse(bin_str, process=True)[0]['value']
 
 
 def test16b():
     assert 3 == day16b('C200B40A82')
+    assert 54 == day16b('04005AC33890')
+    assert 7 == day16b('880086C3E88112')
+    assert 9 == day16b('CE00C43D881120')
+    assert 1 == day16b('D8005AC2A8F0')
+    assert 0 == day16b('F600BC2D8F')
+    assert 0 == day16b('9C005AC2F8F0')
+    assert 1 == day16b('9C0141080250320F1802104A08')
 
 
 if __name__ == '__main__':
     test16a()
     print('Day 16a:', day16a('day16_input.txt'))
-    # test16b()
-    # print('Day 16b:', day16b('day16_input.txt'))
+    test16b()
+    print('Day 16b:', day16b('day16_input.txt'))
