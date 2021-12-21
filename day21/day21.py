@@ -1,3 +1,5 @@
+import copy
+
 import numpy as np
 
 
@@ -10,7 +12,7 @@ def load_input(input_path):
     return pos_list
 
 
-def day20a(input_path):
+def day21a(input_path):
     pos_list = load_input(input_path)
     scores = [0, 0]
     done = False
@@ -28,20 +30,70 @@ def day20a(input_path):
     return np.min(scores) * (roll_ind - 1)
 
 
-def test20a():
-    assert 739785 == day20a('test_input.txt')
+def test21a():
+    assert 739785 == day21a('test_input.txt')
 
 
-def day20b(input_path):
-    pass
+def day21b(input_path):
+    # starting state is one universe with initial positions and scores of zero
+    pos_list = load_input(input_path)
+    initial_scores = (0, 0)
+    # track all possible game states and the number of universes with that state
+    active_states = {(tuple(pos_list), initial_scores): 1}
+
+    wins = [0, 0]
+    player_ind = 0
+    while active_states:
+        new_active_states = dict()
+        for state, n_univ in active_states.items():
+            advance(wins, new_active_states, player_ind, state, n_univ)
+            player_ind = (player_ind + 1) % 2
+        print(len(active_states))
+        active_states = copy.deepcopy(new_active_states)
+
+    for player_ind in range(2):
+        print(f'Player {player_ind+1} wins: {wins[player_ind]}')
+    return np.max(wins)
 
 
-def test20b():
-    assert 3351 == day20b('test_input.txt')
+def advance(wins, active_states, player_ind, current_state, n_univ):
+    roll_value_to_counts = {
+        3: 1,  # there is one way to get a sum of 3 (1, 1, 1)
+        4: 3,  # there are three ways to get a sum of 4...
+        5: 6,
+        6: 7,
+        7: 6,
+        8: 3,
+        9: 1,
+    }
+
+    positions, scores = current_state
+    for steps, mult in roll_value_to_counts.items():
+        # advance the current player and update their score
+        new_pos = (positions[player_ind] + steps - 1) % 10 + 1
+        new_score = scores[player_ind] + new_pos
+        # if their score is >= 21, game is over so add to player's win total
+        if new_score >= 21:
+            wins[player_ind] += mult * n_univ
+            continue
+        # if game is not over, update the dict of active states
+        if player_ind == 0:
+            new_positions = (new_pos, positions[1])
+            new_scores = (new_score, scores[1])
+        else:
+            new_positions = (positions[0], new_pos)
+            new_scores = (scores[0], new_score)
+        new_state = (new_positions, new_scores)
+        current_count = active_states.get(new_state, 0)
+        active_states[new_state] = current_count + mult * n_univ
+
+
+def test21b():
+    assert 444356092776315 == day21b('test_input.txt')
 
 
 if __name__ == '__main__':
-    test20a()
-    print('Day 20a:', day20a('day21_input.txt'))
-    # test20b()
-    # print('Day 20b:', day20b('day20_input.txt'))
+    test21a()
+    print('Day 21a:', day21a('day21_input.txt'))
+    test21b()
+    print('Day 21b:', day21b('day21_input.txt'))
