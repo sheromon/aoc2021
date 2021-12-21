@@ -47,7 +47,7 @@ def day21b(input_path):
         new_active_states = dict()
         for state, n_univ in active_states.items():
             advance(wins, new_active_states, player_ind, state, n_univ)
-            player_ind = (player_ind + 1) % 2
+        player_ind = (player_ind + 1) % 2
         print(len(active_states))
         active_states = copy.deepcopy(new_active_states)
 
