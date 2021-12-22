@@ -22,7 +22,6 @@ def day21a(input_path):
             next_steps = 3 * roll_ind + 3  # sum of three consecutive ints
             pos_list[player_ind] = (pos_list[player_ind] + next_steps - 1) % 10 + 1
             scores[player_ind] += pos_list[player_ind]
-            # print(f'Player {player_ind+1} score: {scores[player_ind]}')
             roll_ind += 3
             if scores[player_ind] >= 1000:
                 done = True
@@ -48,11 +47,8 @@ def day21b(input_path):
         for state, n_univ in active_states.items():
             advance(wins, new_active_states, player_ind, state, n_univ)
         player_ind = (player_ind + 1) % 2
-        print(len(active_states))
         active_states = copy.deepcopy(new_active_states)
 
-    for player_ind in range(2):
-        print(f'Player {player_ind+1} wins: {wins[player_ind]}')
     return np.max(wins)
 
 
