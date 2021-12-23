@@ -1,5 +1,3 @@
-import copy
-
 import numpy as np
 
 
@@ -14,61 +12,64 @@ def load_input(input_path):
 
 class Cavern:
 
-    def __init__(self, risk_array):
-        self.risk_array = risk_array
-        self.high_value = np.sum(self.risk_array)
-        self.total_risk_array = self.high_value * np.ones_like(self.risk_array)
-        self.total_risk_array[-1, -1] = self.risk_array[-1, -1]
-
+    def __init__(self, risk):
+        self.risk = risk
+        # initialize total risk array to a high value so that it's simple to get
+        # the minimum adjacent total risk
+        self.high_value = np.sum(self.risk)
+        self.total_risk = self.high_value * np.ones_like(self.risk)
+        # the total risk at the end postion is just the risk at that position
+        self.total_risk[-1, -1] = self.risk[-1, -1]
 
     def explore(self):
-        n_cols, n_rows = self.risk_array.shape
+        """Fill out the min total risk for all positions in the cavern."""
+        self.calc_first_pass_risk()
+        self.update_total_risk()
+        self.check_total_risk()
+
+    def calc_first_pass_risk(self):
+        """Do a quick first pass of calculating min total risk for the whole cavern.
+
+        Start at the end (bottom right) and move up and to the left, only using
+        adjacent values that are below or to the right. This pass will miss any
+        paths that have lowest adjacent total risk above or to the left.
+        """
+        n_cols, n_rows = self.risk.shape
         for irow in range(n_rows - 2, 0, -1):
             icol = n_cols - 1
             while irow < n_rows:
-                self.total_risk_array[irow, icol] = self.calc_min_risk(irow, icol, self.high_value, set())
+                self.calc_min_risk_low_right(irow, icol)
                 irow += 1
                 icol -= 1
         for icol in range(n_cols - 1, -1, -1):
             irow = 0
             while icol >= 0:
-                self.total_risk_array[irow, icol] = self.calc_min_risk(irow, icol, self.high_value, set())
+                self.calc_min_risk_low_right(irow, icol)
                 irow += 1
                 icol -= 1
 
-    def calc_min_risk(self, irow, icol, max_risk, visited):
-        if self.total_risk_array[irow, icol] < self.high_value:
-            return self.total_risk_array[irow, icol]
+    def calc_min_risk_low_right(self, irow, icol):
+        """Calculate the min risk for this position considering only adjacent
+        positions below and to the right.
+        """
+        neighbors = self.get_neighbors_low_right(irow, icol)
+        adj_total_risks = self.total_risk[tuple(zip(*neighbors))]
+        current_risk = self.risk[irow, icol]
+        self.total_risk[irow, icol] = np.min(adj_total_risks) + current_risk
 
-        neighbors = self.get_neighbor_coords(irow, icol)
-        adj_total_risks = self.total_risk_array[tuple(zip(*neighbors))]
-        min_total = np.min(adj_total_risks)
-
-        next_visited = copy.deepcopy(visited)
-        next_visited.add((irow, icol))
-
-        for coords in neighbors[adj_total_risks < self.high_value]:
-            if tuple(coords) in visited:
-                continue
-            next_risk = self.risk_array[tuple(coords)]
-            if next_risk >= min(max_risk, min_total):
-                continue
-            min_total = min(
-                min_total,
-                self.calc_min_risk(
-                    *tuple(coords),
-                    min(max_risk, min_total) - next_risk,
-                    next_visited,
-                ),
-            )
-        new_total = min_total + self.risk_array[irow, icol]
-        return new_total
-
-    def get_neighbor_coords(self, irow, icol):
+    def get_neighbors_low_right(self, irow, icol):
         deltas = []
-        if irow < self.risk_array.shape[0] - 1:
+        if irow < self.risk.shape[0] - 1:
             deltas.append([1, 0])
-        if icol < self.risk_array.shape[1] - 1:
+        if icol < self.risk.shape[1] - 1:
+            deltas.append([0, 1])
+        return np.array([irow, icol]) + np.array(deltas)
+
+    def get_neighbors(self, irow, icol):
+        deltas = []
+        if irow < self.risk.shape[0] - 1:
+            deltas.append([1, 0])
+        if icol < self.risk.shape[1] - 1:
             deltas.append([0, 1])
         if irow > 0:
             deltas.append([-1, 0])
@@ -76,12 +77,59 @@ class Cavern:
             deltas.append([0, -1])
         return np.array([irow, icol]) + np.array(deltas)
 
+    def update_total_risk(self):
+        """The first pass total risk values will be incorrect if the path goes
+        down or to the right, so check and fix values as needed.
+        """
+        needs_update = []
+        for irow in range(self.risk.shape[0]):
+            for icol in range(self.risk.shape[1]):
+                needs_update.append((irow, icol))
+        while needs_update:
+            new_needs_update = set()
+            for coords in list(needs_update):
+                new_needs_update |= set(self.update_single(coords[0], coords[1]))
+            needs_update = new_needs_update
+
+    def update_single(self, irow, icol):
+        """Check a single total risk value and update if needed.
+
+        If the total risk for this position required an update, flag adjacent
+        positions for checking (except the one used for the update).
+        """
+        needs_update = set()
+        current = self.total_risk[irow, icol]
+        neighbors = self.get_neighbors(irow, icol)
+        adj_total_risks = self.total_risk[tuple(zip(*neighbors))]
+        min_adj = np.min(adj_total_risks)
+        expected = min_adj + self.risk[irow, icol]
+        if current > expected:
+            self.total_risk[irow, icol] = expected
+            new_needs_update = neighbors[adj_total_risks > min_adj]
+            needs_update |= set([tuple(coords) for coords in new_needs_update])
+        return needs_update
+
+    def check_total_risk(self):
+        """Verify that there are no inconsistencies in the total risk map."""
+        total_errors = 0
+        for irow in range(self.risk.shape[0] - 1, 0, -1):
+            for icol in range(self.risk.shape[1] - 1, 0, -1):
+                current = self.total_risk[irow, icol]
+                neighbors = self.get_neighbors(irow, icol)
+                adj_total_risks = self.total_risk[tuple(zip(*neighbors))]
+                min_ind = np.argmin(adj_total_risks)
+                expected = adj_total_risks[min_ind] + self.risk[irow, icol]
+                if current > expected:
+                    print(f'Expected {expected} at ({irow}, {icol}) but found {current}.')
+                    total_errors += 1
+        print(f'Found {total_errors} errors')
+
 
 def day15a(input_path):
-    risk_array = load_input(input_path)
-    cavern = Cavern(risk_array)
+    risk = load_input(input_path)
+    cavern = Cavern(risk)
     cavern.explore()
-    return cavern.total_risk_array[0, 0] - cavern.risk_array[0, 0]
+    return cavern.total_risk[0, 0] - cavern.risk[0, 0]
 
 
 def test15a():
@@ -89,18 +137,18 @@ def test15a():
 
 
 def day15b(input_path):
-    risk_array = load_input(input_path)
+    risk = load_input(input_path)
     array_list = []
     for row_block in range(5):
         array_list_row = []
         for col_block in range(5):
-            array_list_row.append(np.copy(risk_array) + row_block + col_block)
+            array_list_row.append(np.copy(risk) + row_block + col_block)
         array_list.append(np.concatenate(array_list_row, axis=1))
-    risk_array = (np.concatenate(array_list, axis=0) - 1) % 9 + 1
+    risk = (np.concatenate(array_list, axis=0) - 1) % 9 + 1
 
-    cavern = Cavern(risk_array)
+    cavern = Cavern(risk)
     cavern.explore()
-    return cavern.total_risk_array[0, 0] - cavern.risk_array[0, 0]
+    return cavern.total_risk[0, 0] - cavern.risk[0, 0]
 
 
 def test15b():
