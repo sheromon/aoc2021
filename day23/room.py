@@ -28,7 +28,6 @@ class Room:
             if self.col_is_open(col):
                 print(f'Col {col} is open')
 
-
     def get_amph(self, coords):
         for amph in self.amphs:
             if amph.coords == coords:
@@ -82,16 +81,19 @@ class Room:
             amph_letter = self.array[3, col]
             return col == Amphipod.home_col_map[amph_letter]
 
-    def move(self, amph, coords):
-        """Try to move an amphipod from its current position to a new position.
+    def check_move(self, amph, coords):
+        """Check if amphipod can move to the given position.
 
-        If the move is not successful, False will be returned.
+        If the move is possible, return the number of steps. Otherwise, return 0.
+
+        This is just a check, so the amphipod will be in its original position
+        at the end of this method.
         """
         if coords not in self.open_coords:
-            return False
+            return 0
         # an amphipod on the hallway can only move to its home column
         if amph.coords[0] == 1 and coords[1] != amph.home_col:
-            return False
+            return 0
         coords = np.array(coords)
         next_coords = np.zeros_like(coords)
         steps = 0
@@ -112,11 +114,23 @@ class Room:
                     stepped = True
                     break
             if not stepped:
-                amph.coords = orig_coords
-                return False
+                steps = 0
+                break
+        amph.coords = orig_coords
+        return steps
+
+    def move(self, amph, coords):
+        """Attempt to move an amphipod to the given position.
+
+        Return True if the move succeeds and False otherwise.
+        """
+        num_steps = self.check_move(amph, coords)
+        if not num_steps:
+            return False
         self.open_coords.remove(tuple(coords))
-        self.open_coords.add(orig_coords)
-        self.array[amph.coords] = amph.letter
-        self.array[orig_coords] = '.'
-        amph.step(steps)
+        self.open_coords.add(amph.coords)
+        self.array[amph.coords] = '.'
+        self.array[tuple(coords)] = amph.letter
+        amph.coords = coords
+        amph.step(num_steps)
         return True
