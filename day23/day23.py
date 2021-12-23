@@ -22,10 +22,24 @@ def day23a(input_path):
     # array[1, 3:10:2] = '#'
     print(array)
 
-    amph = room.amphs[2]
+    # amph = room.amphs[2]
+    # result = room.move(amph, (1, 2))
+    # print(room.array)
+    # breakpoint()
+    for amph in room.amphs:
+        if amph not in room.movers:
+            print(amph)
     breakpoint()
-    result = room.move(amph, (1, 2))
+
+    any_success = False
+    for amph in room.movers:
+        for coords in room.open_coords:
+            success = room.move(amph, coords)
+            if success:
+                any_success = True
+                break
     print(room.array)
+    print(any_success)
     breakpoint()
 
     min_energy = None
@@ -60,6 +74,10 @@ class Amphipod:
     def step(self, n_steps):
         self.energy_used += n_steps * self.energy_per_step
 
+    @property
+    def is_home(self):
+        return self.coords[1] == self.home_col
+
 
 class Room:
 
@@ -75,12 +93,32 @@ class Room:
                 amph = Amphipod(letter, coords)
                 self.amphs.append(amph)
 
+        self.movers = []
+        self.set_movers()
+
+
+    def set_movers(self):
+        """Identify the amphipods that are not in their ending place."""
+        self.movers = []
+        for amph in self.amphs:
+            if amph.coords[1] != amph.home_col:
+                self.movers.append(amph)
+                continue
+            if amph.coords[0] == 2:
+                coords_below = np.array(amph.coords) + np.array([-1, 0])
+                if self.array[tuple(coords_below)] != amph.letter:
+                    self.movers.append(amph)
+
+
     def move(self, amph, coords):
         """Try to move an amphipod from its current position to a new position.
 
         If the move is not successful, False will be returned.
         """
         if coords not in self.open_coords:
+            return False
+        # an amphipod on the hallway can only move to its home column
+        if amph.coords[0] == 1 and coords[1] != amph.home_col:
             return False
         coords = np.array(coords)
         next_coords = np.zeros_like(coords)
@@ -108,6 +146,8 @@ class Room:
         self.array[amph.coords] = amph.letter
         self.array[orig_coords] = '.'
         amph.step(steps)
+        if amph.is_home:
+            self.set_movers()
         return True
 
 
