@@ -29,21 +29,33 @@ def day23a(input_path):
     for amph in room.amphs:
         if amph not in room.movers:
             print(amph)
-    breakpoint()
+    # breakpoint()
 
-    any_success = False
-    for amph in room.movers:
-        for coords in room.open_coords:
-            success = room.move(amph, coords)
-            if success:
-                any_success = True
-                break
+    moves = [
+        [(2, 7), (1, 4)],
+        [(2, 5), (1, 6)],
+        [(1, 6), (2, 7)],
+        [(3, 5), (1, 6)],
+        [(1, 4), (3, 5)],
+        [(2, 3), (1, 4)],
+        [(1, 4), (2, 5)],
+        [(2, 9), (1, 8)],
+        [(3, 9), (1, 10)],
+        [(1, 8), (3, 9)],
+        [(1, 6), (2, 9)],
+        [(1, 10), (2, 3)],
+    ]
+    for origin, dest in moves:
+        amph = room.get_amph(origin)
+        # breakpoint()
+        success = room.move(amph, dest)
+        if not success:
+            raise RuntimeError('Failed move')
     print(room.array)
-    print(any_success)
-    breakpoint()
 
-    min_energy = None
-    return min_energy
+    total_energy = sum([amph.energy_used for amph in room.amphs])
+    # breakpoint()
+    return total_energy
 
 
 class Amphipod:
@@ -96,6 +108,10 @@ class Room:
         self.movers = []
         self.set_movers()
 
+    def get_amph(self, coords):
+        for amph in self.amphs:
+            if amph.coords == coords:
+                return amph
 
     def set_movers(self):
         """Identify the amphipods that are not in their ending place."""
@@ -109,6 +125,10 @@ class Room:
                 if self.array[tuple(coords_below)] != amph.letter:
                     self.movers.append(amph)
 
+    def select_mover(self):
+        home_cols = [3, 5, 7, 9]
+        for col in home_cols:
+            pass
 
     def move(self, amph, coords):
         """Try to move an amphipod from its current position to a new position.
@@ -165,6 +185,6 @@ def test23b():
 
 if __name__ == '__main__':
     test23a()
-    print('Day 23a:', day23a('day23_input.txt'))
+    # print('Day 23a:', day23a('day23_input.txt'))
     # test23b()
     # print('Day 23b:', day23b('day23_input.txt'))
