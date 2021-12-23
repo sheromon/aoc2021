@@ -1,5 +1,7 @@
 import numpy as np
 
+from room import Room
+
 
 def load_input(input_path):
     char_list = []
@@ -15,22 +17,34 @@ def load_input(input_path):
     return np.array(char_list)
 
 
-def day23a(input_path):
+def day23a(input_path, use_solution=False):
     array = load_input(input_path)
     array[-2:, :2] = '#'
     room = Room(array)
-    # array[1, 3:10:2] = '#'
-    print(array)
 
-    # amph = room.amphs[2]
-    # result = room.move(amph, (1, 2))
-    # print(room.array)
-    # breakpoint()
-    for amph in room.amphs:
-        if amph not in room.movers:
-            print(amph)
-    # breakpoint()
+    min_energy = None
+    if use_solution:
+        run_test_case_solution(room)
+        min_energy = room.energy_used
+    else:
+        room.print_info()
+        run_room(room)
+        if room.complete:
+            total_energy = room.energy_used
+            print(f'Total energy: {total_energy}')
+            if not min_energy:
+                min_energy = total_energy
+            else:
+                min_energy = min(min_energy, total_energy)
 
+    return min_energy
+
+
+def run_test_case_solution(room):
+    """Run the example solution given in the problem.
+
+    This set of moves gives the optimal energy for part 1.
+    """
     moves = [
         [(2, 7), (1, 4)],
         [(2, 5), (1, 6)],
@@ -47,132 +61,58 @@ def day23a(input_path):
     ]
     for origin, dest in moves:
         amph = room.get_amph(origin)
-        # breakpoint()
         success = room.move(amph, dest)
         if not success:
+            room.print_info()
             raise RuntimeError('Failed move')
-    print(room.array)
-
-    total_energy = sum([amph.energy_used for amph in room.amphs])
-    # breakpoint()
-    return total_energy
 
 
-class Amphipod:
-
-    energy_map = {
-        'A': 1,
-        'B': 10,
-        'C': 100,
-        'D': 1000,
-    }
-    col_map = {
-        'A': 3,
-        'B': 5,
-        'C': 7,
-        'D': 9,
-    }
-
-    def __init__(self, letter, coords):
-        self.letter = letter
-        self.energy_per_step = self.energy_map[letter]
-        self.home_col = self.col_map[letter]
-        self.coords = coords
-        self.energy_used = 0
-
-    def __repr__(self) -> str:
-        return f'{self.letter}: {self.coords}, {self.energy_used}'
-
-    def step(self, n_steps):
-        self.energy_used += n_steps * self.energy_per_step
-
-    @property
-    def is_home(self):
-        return self.coords[1] == self.home_col
+def run_room(room):
+    any_success = True
+    while any_success:
+        success1 = run_hallway_movers(room)
+        success2 = run_room_movers(room)
+        any_success = success1 or success2
 
 
-class Room:
+def run_hallway_movers(room):
+    # attempt to move any amphs in the hallway to their home column
+    any_success = True
+    while any_success:
+        any_success = False
+        for amph in room.hallway_movers:
+            if room.col_is_open(amph.home_col):
+                dest_options = [(3, amph.home_col), (2, amph.home_col)]
+                for dest in dest_options:
+                    if room.array[dest] == '.':
+                        success = room.move(amph, dest)
+                        if success:
+                            any_success = True
+                            print(f'Moved {amph}')
+                            room.print_info()
+                            break
+    print('No hallway movers')
+    return any_success
 
-    def __init__(self, array):
-        self.array = array
-        self.open_coords = set(zip(*np.where(array == '.')))
-        self.open_coords -= set([(1, 3), (1, 5), (1, 7), (1, 9)])
 
-        self.amphs = []
-        for letter in Amphipod.energy_map:
-            inds = np.where(array == letter)
-            for coords in zip(*inds):
-                amph = Amphipod(letter, coords)
-                self.amphs.append(amph)
-
-        self.movers = []
-        self.set_movers()
-
-    def get_amph(self, coords):
-        for amph in self.amphs:
-            if amph.coords == coords:
-                return amph
-
-    def set_movers(self):
-        """Identify the amphipods that are not in their ending place."""
-        self.movers = []
-        for amph in self.amphs:
-            if amph.coords[1] != amph.home_col:
-                self.movers.append(amph)
+def run_room_movers(room):
+    # attempt to move an amphipod from a room to the hallway
+    for amph in room.room_movers:
+        for dest in room.open_coords:
+            # ignore non-hallway destinations
+            if dest[0] != 1:
                 continue
-            if amph.coords[0] == 2:
-                coords_below = np.array(amph.coords) + np.array([-1, 0])
-                if self.array[tuple(coords_below)] != amph.letter:
-                    self.movers.append(amph)
-
-    def select_mover(self):
-        home_cols = [3, 5, 7, 9]
-        for col in home_cols:
-            pass
-
-    def move(self, amph, coords):
-        """Try to move an amphipod from its current position to a new position.
-
-        If the move is not successful, False will be returned.
-        """
-        if coords not in self.open_coords:
-            return False
-        # an amphipod on the hallway can only move to its home column
-        if amph.coords[0] == 1 and coords[1] != amph.home_col:
-            return False
-        coords = np.array(coords)
-        next_coords = np.zeros_like(coords)
-        steps = 0
-        orig_coords = amph.coords
-        while not np.all(next_coords == coords):
-            signs = np.sign(np.array(coords) - np.array(amph.coords))
-            stepped = False
-            for ind, sign in enumerate(signs):
-                if not sign:
-                    continue
-                direction = np.zeros(2, dtype=np.int32)
-                direction[ind] = sign
-                next_coords = np.array(amph.coords) + direction
-                if self.array[tuple(next_coords)] == '.':
-                    amph.coords = tuple(next_coords)
-                    steps += 1
-                    stepped = True
-                    break
-            if not stepped:
-                amph.coords = orig_coords
-                return False
-        self.open_coords.remove(tuple(coords))
-        self.open_coords.add(orig_coords)
-        self.array[amph.coords] = amph.letter
-        self.array[orig_coords] = '.'
-        amph.step(steps)
-        if amph.is_home:
-            self.set_movers()
-        return True
+            success = room.move(amph, dest)
+            if success:
+                print(f'Moved {amph}')
+                room.print_info()
+                return True
+    return False
 
 
 def test23a():
-    assert 12521 == day23a('test_input.txt')
+    assert 12521 == day23a('test_input.txt', use_solution=True)
+    assert 12521 == day23a('test_input.txt', use_solution=False)
 
 
 def day23b(input_path):
