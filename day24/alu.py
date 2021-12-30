@@ -2,10 +2,10 @@ import numpy as np
 
 class Alu:
 
-    def __init__(self, instructs, input_list, constants=None, gen_expressions=False):
+    def __init__(self, steps, input_list, constants=None, gen_expressions=False):
         """Initialize ALU.
 
-        :param instructs: list of instructions, where each instruction is a list
+        :param steps: list of instructions, where each instruction is a list
             of two to three strings (two for inputs and three for operations)
         :param input_list: list of integers
         :param constants: optional sequence of values that can be used instead
@@ -15,7 +15,7 @@ class Alu:
         :param gen_expressions: optional boolean; if True, string expressions
             will be generated for each variable (e.g. "(inp 0 + 2) * 26")
         """
-        self.instructs = instructs
+        self.steps = steps
         self.ins_ind = 0  # keep track of which instruction we're on
         if isinstance(input_list, str):
             input_list = [int(char) for char in input_list]
@@ -28,7 +28,7 @@ class Alu:
         # constants with values not equal to -1 will be used for that step
         # pretty sure the states never go negative, so this should be okay to do
         if constants is None:
-            constants = -1 * np.ones(len(self.instructs))
+            constants = -1 * np.ones(len(self.steps))
         self.constants = constants
         self.gen_expressions = gen_expressions
         # will hold the string expressions for each variable
@@ -42,25 +42,19 @@ class Alu:
             instruction list; defaults to None
         """
         if max_steps is None:
-            max_steps = len(self.instructs)
-        for _ in self.instructs[:max_steps]:
+            max_steps = len(self.steps)
+        for _ in self.steps[:max_steps]:
             self.step()
-        if self.vals['z'] == 0:
-            input_str = ''.join([str(val) for val in self.input_list])
-            print(input_str, 'is valid')
         return self
 
     def step(self):
         """Run one step of the ALU processing."""
-        instruction = self.instructs[self.ins_ind]
+        instruction = self.steps[self.ins_ind]
         op = instruction[0]
         name = instruction[1]
         if op == 'inp':
-            if len(instruction) == 2:
-                ind = self.inp_ind
-                self.inp_ind += 1
-            else:
-                ind = instruction[2]
+            ind = self.inp_ind
+            self.inp_ind += 1
             self.vals[name] = int(self.input_list[ind])
             self.exprs[name] = f'{op} {ind}'
         else:
