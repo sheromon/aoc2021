@@ -1,6 +1,7 @@
 import copy
 import itertools
 import logging
+import time
 
 import numpy as np
 
@@ -134,29 +135,34 @@ def align_pair(scanner_0, original_scanner_1, expected_num):
         for orientation in orientations:
             scanner_1 = transform(original_scanner_1, col_perm, orientation)
             for coords_0 in scanner_0.beacon_array:
-                for coords_1 in scanner_1.beacon_array:
-                    delta = coords_0 - coords_1
-                    offset_beacon_array = scanner_1.beacon_array + delta
-                    logging.debug('Offset beacon_list:')
-                    logging.debug(offset_beacon_array)
+                deltas = coords_0 - scanner_1.beacon_array
+                deltas_tiled = np.tile(
+                    np.expand_dims(deltas.T, axis=0),
+                    (len(deltas), 1, 1))
+                scanner_1_tiled = np.tile(
+                    np.expand_dims(scanner_1.beacon_array, axis=-1),
+                    (1, 1, len(deltas)))
+                offset_beacon_array = scanner_1_tiled + deltas_tiled
 
-                    coords_0_set = set((tuple(elem) for elem in scanner_0.beacon_array.tolist()))
-                    offset_coords_set = set((tuple(elem) for elem in offset_beacon_array.tolist()))
-                    num_common0 = len(coords_0_set & offset_coords_set)
+                num_common = np.sum(
+                    np.isin(
+                        coords_to_1d(offset_beacon_array).T,
+                        coords_to_1d(scanner_0.beacon_array)),
+                    axis=1)
+                found_match = (num_common / expected_num) >= 1
+                if not np.any(found_match):
+                    continue
 
-                    combined_beacons = np.vstack([scanner_0.beacon_array, offset_beacon_array])
-                    beacon_union = np.unique(combined_beacons, axis=0)
-                    num_common = len(combined_beacons) - len(beacon_union)
-                    if num_common0 != num_common:
-                        raise RuntimeError('Incorrect calculation for num_common')
+                scanner_1.translate(deltas[np.argmax(found_match)])
+                new_scanner = scanner_0.merge(scanner_1)
+                return new_scanner
 
-                    logging.debug(num_common / expected_num)
-                    found_match = num_common / expected_num >= 1
 
-                    if found_match:
-                        scanner_1.translate(delta)
-                        new_scanner = scanner_0.merge(scanner_1)
-                        return new_scanner
+def coords_to_1d(array):
+    coords_1d = 0
+    for ind in range(array.shape[1]):
+        coords_1d += array[:, ind] * 2001**ind
+    return coords_1d
 
 
 def day19a(input_path, test=False):
@@ -234,4 +240,4 @@ if __name__ == '__main__':
     test19a()
     print('Day 19a:', day19a('day19_input.txt'))
     test19b()
-    print('Day 19b:', day19b('day19_input.txt'))
+    print('Day 19b:', day19b())
